@@ -1,0 +1,76 @@
+name: Terraform Plan
+
+on:
+  workflow_call:
+    inputs:
+      terraform-root:
+        description: Self-contained Terraform root, for example myapp/dev.
+        required: true
+        type: string
+      terraform-version:
+        description: Terraform version to install.
+        required: false
+        default: 1.14.3
+        type: string
+      backend-config:
+        description: Newline-delimited terraform init backend-config values.
+        required: false
+        default: ""
+        type: string
+      terraform-args:
+        description: Additional arguments passed to terraform plan.
+        required: false
+        default: ""
+        type: string
+      upload-plan:
+        description: Upload the binary Terraform plan as an artifact.
+        required: false
+        default: true
+        type: boolean
+    secrets:
+      TF_API_TOKEN:
+        description: Optional Terraform Cloud API token.
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: Plan ${{ inputs.terraform-root }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.terraform-root }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Terraform
+        uses: ./.github/actions/setup-terraform
+        with:
+          terraform-version: ${{ inputs.terraform-version }}
+          terraform-cloud-token: ${{ secrets.TF_API_TOKEN }}
+      - name: Check formatting
+        run: terraform fmt -check -recursive
+      - name: Initialize Terraform
+        shell: bash
+        run: |
+          init_args=()
+          while IFS= read -r backend_config; do
+            [ -z "$backend_config" ] || init_args+=("-backend-config=$backend_config")
+          done <<'EOF'
+          ${{ inputs.backend-config }}
+          EOF
+          terraform init -input=false "${init_args[@]}"
+      - name: Validate configuration
+        run: terraform validate -no-color
+      - name: Create plan
+        run: terraform plan -input=false -no-color -out=tfplan ${{ inputs.terraform-args }}
+      - name: Upload plan
+        if: inputs.upload-plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan-${{ github.run_id }}
+          path: ${{ inputs.terraform-root }}/tfplan
+          if-no-files-found: error
+          retention-days: 7

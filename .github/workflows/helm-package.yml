@@ -1,0 +1,56 @@
+name: Helm Package
+
+on:
+  workflow_call:
+    inputs:
+      chart-path:
+        required: true
+        type: string
+      helm-version:
+        required: false
+        default: v3.17.0
+        type: string
+      oci-registry:
+        required: false
+        default: ""
+        type: string
+      push:
+        required: false
+        default: false
+        type: boolean
+    outputs:
+      chart-package:
+        value: ${{ jobs.package.outputs.chart-package }}
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    outputs:
+      chart-package: ${{ steps.package.outputs.chart-package }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-helm
+        with:
+          helm-version: ${{ inputs.helm-version }}
+      - name: Build dependencies
+        run: helm dependency build ${{ inputs.chart-path }}
+      - name: Lint chart
+        run: helm lint ${{ inputs.chart-path }}
+      - id: package
+        name: Package chart
+        shell: bash
+        run: |
+          mkdir -p dist
+          helm package "${{ inputs.chart-path }}" --destination dist
+          echo "chart-package=$(find dist -name '*.tgz' -print -quit)" >> "$GITHUB_OUTPUT"
+      - name: Push chart
+        if: inputs.push
+        run: helm push ${{ steps.package.outputs.chart-package }} ${{ inputs.oci-registry }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: helm-chart-${{ github.run_id }}
+          path: dist/*.tgz
+          if-no-files-found: error

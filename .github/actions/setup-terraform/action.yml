@@ -1,0 +1,24 @@
+name: Setup Terraform
+description: Install Terraform with the GitHub Actions plugin cache enabled.
+
+inputs:
+  terraform-version:
+    description: Terraform version to install.
+    required: true
+  terraform-cloud-token:
+    description: Optional Terraform Cloud API token.
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: Configure plugin cache
+      shell: bash
+      run: |
+        echo "TF_PLUGIN_CACHE_DIR=$RUNNER_TOOL_CACHE/terraform-plugin-cache" >> "$GITHUB_ENV"
+        mkdir -p "$RUNNER_TOOL_CACHE/terraform-plugin-cache"
+    - name: Install Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ inputs.terraform-version }}
+        cli_config_credentials_token: ${{ inputs.terraform-cloud-token }}

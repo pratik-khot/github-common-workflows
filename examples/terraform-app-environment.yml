@@ -1,0 +1,33 @@
+name: Terraform MyApp Dev
+
+on:
+  pull_request:
+    paths:
+      - myapp/dev/**
+      - .github/workflows/terraform-myapp-dev.yml
+  push:
+    branches: [main]
+    paths:
+      - myapp/dev/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  plan:
+    if: github.event_name == 'pull_request'
+    uses: YOUR_ORG/github-common-workflows/.github/workflows/terraform-plan.yml@v1
+    with:
+      terraform-root: myapp/dev
+    secrets: inherit
+
+  apply:
+    if: github.event_name != 'pull_request'
+    uses: YOUR_ORG/github-common-workflows/.github/workflows/terraform-apply.yml@v1
+    with:
+      terraform-root: myapp/dev
+      environment: dev
+      aws-region: us-east-1
+    secrets: inherit

@@ -1,0 +1,98 @@
+name: GitOps Update
+
+on:
+  workflow_call:
+    inputs:
+      gitops-repository:
+        description: Owner/repository of the GitOps source.
+        required: true
+        type: string
+      gitops-ref:
+        required: false
+        default: main
+        type: string
+      target-directory:
+        description: Directory inside the GitOps repository to update.
+        required: true
+        type: string
+      update-type:
+        description: kustomize-image or helm-value.
+        required: true
+        type: string
+      image-name:
+        required: false
+        default: ""
+        type: string
+      image-reference:
+        required: true
+        type: string
+      helm-values-path:
+        description: YAML path to the Helm image value, for example .image.tag.
+        required: false
+        default: ""
+        type: string
+      create-pull-request:
+        required: false
+        default: true
+        type: boolean
+    secrets:
+      GITOPS_TOKEN:
+        description: GitHub App token or PAT authorized to write to the GitOps repository.
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout GitOps repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.gitops-repository }}
+          ref: ${{ inputs.gitops-ref }}
+          token: ${{ secrets.GITOPS_TOKEN }}
+          path: gitops
+      - name: Install Kustomize
+        if: inputs.update-type == 'kustomize-image'
+        uses: imranismail/setup-kustomize@v2
+      - name: Install yq
+        if: inputs.update-type == 'helm-value'
+        uses: mikefarah/yq@v4.45.1
+      - name: Update Kustomize image
+        if: inputs.update-type == 'kustomize-image'
+        working-directory: gitops/${{ inputs.target-directory }}
+        run: kustomize edit set image ${{ inputs.image-name }}=${{ inputs.image-reference }}
+      - name: Update Helm values
+        if: inputs.update-type == 'helm-value'
+        working-directory: gitops/${{ inputs.target-directory }}
+        env:
+          IMAGE_REFERENCE: ${{ inputs.image-reference }}
+          HELM_VALUES_PATH: ${{ inputs.helm-values-path }}
+        run: yq -i "$HELM_VALUES_PATH = strenv(IMAGE_REFERENCE)" values.yaml
+      - name: Verify Kustomize configuration
+        if: inputs.update-type == 'kustomize-image'
+        working-directory: gitops/${{ inputs.target-directory }}
+        run: kustomize build . > /dev/null
+      - name: Create pull request
+        if: inputs.create-pull-request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITOPS_TOKEN }}
+          path: gitops
+          branch: chore/gitops-image-update-${{ github.run_id }}
+          commit-message: "chore: update deployment image"
+          title: "chore: update deployment image"
+          body: "Automated update from ${{ github.repository }}."
+      - name: Commit directly
+        if: "!inputs.create-pull-request"
+        working-directory: gitops
+        env:
+          TARGET_DIRECTORY: ${{ inputs.target-directory }}
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add "$TARGET_DIRECTORY"
+          git commit -m "chore: update deployment image"
+          git push

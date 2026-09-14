@@ -1,0 +1,16 @@
+name: Setup kubectl
+description: Install kubectl.
+
+inputs:
+  kubectl-version:
+    description: kubectl version to install.
+    required: false
+    default: v1.32.0
+
+runs:
+  using: composite
+  steps:
+    - name: Install kubectl
+      uses: azure/setup-kubectl@v4
+      with:
+        version: ${{ inputs.kubectl-version }}

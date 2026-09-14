@@ -1,0 +1,81 @@
+name: Terraform Apply
+
+on:
+  workflow_call:
+    inputs:
+      terraform-root:
+        description: Self-contained Terraform root, for example myapp/prod.
+        required: true
+        type: string
+      environment:
+        description: Protected GitHub Environment that authorizes this deployment.
+        required: true
+        type: string
+      action:
+        description: Terraform action.
+        required: false
+        default: apply
+        type: string
+      allow-destroy:
+        description: Explicitly permit the destroy action.
+        required: false
+        default: false
+        type: boolean
+      terraform-version:
+        description: Terraform version to install.
+        required: false
+        default: 1.14.3
+        type: string
+      terraform-args:
+        description: Additional arguments passed to Terraform.
+        required: false
+        default: ""
+        type: string
+      aws-region:
+        description: AWS region for the assumed role.
+        required: true
+        type: string
+    secrets:
+      AWS_ROLE_ARN:
+        required: true
+      TF_API_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    name: ${{ inputs.action }} ${{ inputs.terraform-root }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.terraform-root }}
+    steps:
+      - name: Reject unapproved destroy
+        if: inputs.action == 'destroy' && !inputs.allow-destroy
+        run: exit 1
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Configure AWS
+        uses: ./.github/actions/aws-login
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ inputs.aws-region }}
+      - name: Setup Terraform
+        uses: ./.github/actions/setup-terraform
+        with:
+          terraform-version: ${{ inputs.terraform-version }}
+          terraform-cloud-token: ${{ secrets.TF_API_TOKEN }}
+      - name: Initialize Terraform
+        run: terraform init -input=false
+      - name: Validate configuration
+        run: terraform validate -no-color
+      - name: Apply changes
+        if: inputs.action == 'apply'
+        run: terraform apply -input=false -auto-approve ${{ inputs.terraform-args }}
+      - name: Destroy changes
+        if: inputs.action == 'destroy' && inputs.allow-destroy
+        run: terraform destroy -input=false -auto-approve ${{ inputs.terraform-args }}

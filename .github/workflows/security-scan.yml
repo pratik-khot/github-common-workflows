@@ -1,0 +1,56 @@
+name: Security Scan
+
+on:
+  workflow_call:
+    inputs:
+      terraform-root:
+        required: false
+        default: .
+        type: string
+      image-reference:
+        required: false
+        default: ""
+        type: string
+      scan-terraform:
+        required: false
+        default: true
+        type: boolean
+      scan-secrets:
+        required: false
+        default: true
+        type: boolean
+      scan-image:
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan Terraform
+        if: inputs.scan-terraform
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: ${{ inputs.terraform-root }}
+          framework: terraform
+      - name: Scan secrets
+        if: inputs.scan-secrets
+        uses: gitleaks/gitleaks-action@v2
+      - name: Scan container image
+        if: inputs.scan-image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ inputs.image-reference }}
+          format: sarif
+          output: trivy-results.sarif
+      - name: Upload container scan
+        if: inputs.scan-image && always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif

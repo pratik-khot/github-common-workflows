@@ -1,0 +1,16 @@
+name: Setup Helm
+description: Install Helm.
+
+inputs:
+  helm-version:
+    description: Helm version to install.
+    required: false
+    default: v3.17.0
+
+runs:
+  using: composite
+  steps:
+    - name: Install Helm
+      uses: azure/setup-helm@v4
+      with:
+        version: ${{ inputs.helm-version }}
