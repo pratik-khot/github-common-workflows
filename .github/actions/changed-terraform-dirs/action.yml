@@ -1,0 +1,33 @@
+name: Changed Terraform Dirs
+description: Detect changed top-level folders and output them for CI matrices.
+
+outputs:
+  dirs:
+    description: JSON array of changed top-level folders.
+    value: ${{ steps.changed.outputs.dirs }}
+
+runs:
+  using: composite
+  steps:
+    - id: changed
+      name: Detect changed folders
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          git fetch origin "${{ github.base_ref }}"
+          changed_files=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
+        else
+          changed_files=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}")
+        fi
+
+        dirs=$(printf '%s\n' "$changed_files" \
+          | awk -F/ 'NF > 1 {print $1}' \
+          | sort -u \
+          | jq -R -s -c 'split("\n") | map(select(length > 0))')
+
+        [[ "$dirs" == "[]" ]] && dirs='["none"]'
+
+        echo "dirs=$dirs" >> "$GITHUB_OUTPUT"
+        echo "Changed folders: $dirs"

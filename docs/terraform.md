@@ -7,3 +7,4 @@ Plan accepts an optional `TF_API_TOKEN` secret for Terraform Cloud and newline-d
 The apply workflow binds its job to the supplied `environment`. Configure approvals, deployment branches, and environment secrets in every caller repository. `destroy` only runs when `action: destroy` and `allow-destroy: true` are both supplied.
 
 Caller workflows own triggers and path filters. Use paths such as `myapp/dev/**`, not a common `iac/**` path.
+
