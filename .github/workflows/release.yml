@@ -7,13 +7,10 @@ on:
         required: false
         default: simple
         type: string
-      config-file:
+      release-as:
+        description: Exact version to release, for example 0.2.0.
         required: false
-        default: release-please-config.json
-        type: string
-      manifest-file:
-        required: false
-        default: .release-please-manifest.json
+        default: ""
         type: string
     outputs:
       release-created:
@@ -40,5 +37,4 @@ jobs:
         with:
           token: ${{ secrets.RELEASE_TOKEN || github.token }}
           release-type: ${{ inputs.release-type }}
-          config-file: ${{ inputs.config-file }}
-          manifest-file: ${{ inputs.manifest-file }}
+          release-as: ${{ inputs.release-as }}

@@ -1,0 +1,20 @@
+name: Release Please
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version, for example 0.2.0.
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    uses: ./.github/workflows/release.yml
+    with:
+      release-as: ${{ inputs.version }}
+    secrets: inherit
