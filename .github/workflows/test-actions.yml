@@ -47,7 +47,8 @@ jobs:
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             changed_files=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
           else
-            if [[ -n "$EVENT_BEFORE" && ! "$EVENT_BEFORE" =~ ^0+$ ]]; then
+            if [[ -n "$EVENT_BEFORE" && ! "$EVENT_BEFORE" =~ ^0+$ ]] && \
+              git cat-file -e "$EVENT_BEFORE^{commit}" 2>/dev/null; then
               changed_files=$(git diff --name-only "$EVENT_BEFORE" "$EVENT_SHA")
             elif git rev-parse --verify "${EVENT_SHA}^" >/dev/null 2>&1; then
               changed_files=$(git diff --name-only "${EVENT_SHA}^" "$EVENT_SHA")
