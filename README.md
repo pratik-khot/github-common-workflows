@@ -34,7 +34,7 @@ Use a released major version in callers. Pin production-critical workflows to an
 ```yaml
 jobs:
   plan:
-    uses: YOUR_ORG/github-common-workflows/.github/workflows/terraform-plan.yml@v1
+    uses: pratik-khot/github-common-workflows/.github/workflows/terraform-plan.yml@v1
     with:
       terraform-root: myapp/dev
       terraform-version: 1.14.3
@@ -50,7 +50,7 @@ permissions:
 
 jobs:
   apply:
-    uses: YOUR_ORG/github-common-workflows/.github/workflows/terraform-apply.yml@v1
+    uses: pratik-khot/github-common-workflows/.github/workflows/terraform-apply.yml@v1
     with:
       terraform-root: myapp/prod
       environment: prod
@@ -98,7 +98,7 @@ permissions:
 
 jobs:
   publish:
-    uses: YOUR_ORG/github-common-workflows/.github/workflows/docker-publish.yml@v1
+    uses: pratik-khot/github-common-workflows/.github/workflows/docker-publish.yml@v1
     with:
       context: src/catalog
       image-name: catalog
@@ -114,7 +114,7 @@ jobs:
 ```yaml
 jobs:
   package:
-    uses: YOUR_ORG/github-common-workflows/.github/workflows/helm-package.yml@v1
+    uses: pratik-khot/github-common-workflows/.github/workflows/helm-package.yml@v1
     with:
       chart-path: charts/catalog
       push: false
@@ -125,7 +125,7 @@ jobs:
 ```yaml
 jobs:
   update-gitops:
-    uses: YOUR_ORG/github-common-workflows/.github/workflows/gitops-update.yml@v1
+    uses: pratik-khot/github-common-workflows/.github/workflows/gitops-update.yml@v1
     with:
       gitops-repository: YOUR_ORG/gitops-repo
       target-directory: apps/catalog/overlays/dev
@@ -147,7 +147,7 @@ permissions:
 
 jobs:
   security:
-    uses: YOUR_ORG/github-common-workflows/.github/workflows/security-scan.yml@v1
+    uses: pratik-khot/github-common-workflows/.github/workflows/security-scan.yml@v1
     with:
       terraform-root: myapp/dev
       scan-image: true
@@ -163,7 +163,7 @@ permissions:
 
 jobs:
   release:
-    uses: YOUR_ORG/github-common-workflows/.github/workflows/release.yml@v1
+    uses: pratik-khot/github-common-workflows/.github/workflows/release.yml@v1
     with:
       release-type: simple
 ```
@@ -188,7 +188,7 @@ permissions:
 
 steps:
   - uses: actions/checkout@v4
-  - uses: YOUR_ORG/github-common-workflows/.github/actions/aws-login@v1
+  - uses: pratik-khot/github-common-workflows/.github/actions/aws-login@v1
     with:
       role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
       aws-region: us-east-1

@@ -12,6 +12,9 @@ runs:
     - id: changed
       name: Detect changed folders
       shell: bash
+      env:
+        EVENT_BEFORE: ${{ github.event.before }}
+        EVENT_SHA: ${{ github.sha }}
       run: |
         set -euo pipefail
 
@@ -19,11 +22,18 @@ runs:
           git fetch origin "${{ github.base_ref }}"
           changed_files=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
         else
-          changed_files=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}")
+          if [[ -n "$EVENT_BEFORE" && ! "$EVENT_BEFORE" =~ ^0+$ ]]; then
+            git cat-file -e "$EVENT_BEFORE^{commit}"
+            changed_files=$(git diff --name-only "$EVENT_BEFORE" "$EVENT_SHA")
+          elif git rev-parse --verify "${EVENT_SHA}^" >/dev/null 2>&1; then
+            changed_files=$(git diff --name-only "${EVENT_SHA}^" "$EVENT_SHA")
+          else
+            changed_files=$(git show --format= --name-only "$EVENT_SHA")
+          fi
         fi
 
         dirs=$(printf '%s\n' "$changed_files" \
-          | awk -F/ 'NF > 1 {print $1}' \
+          | awk -F/ 'NF > 1 && $1 != ".github" && $0 ~ /\.tf$/ {print $1}' \
           | sort -u \
           | jq -R -s -c 'split("\n") | map(select(length > 0))')
 

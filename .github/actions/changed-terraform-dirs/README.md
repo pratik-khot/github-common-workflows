@@ -38,6 +38,9 @@ jobs:
           terraform validate -no-color
 ```
 
+The action considers only changed files ending in `.tf`. Changes under `.github/`, documentation, or other non-Terraform paths do not trigger Terraform jobs. It outputs a JSON array such as `["modules"]` for changed Terraform paths under `modules/`. When no changed Terraform path contains a folder separator, it outputs `["none"]`.
+
+For pull requests it compares the base branch with `HEAD`; for pushes it compares `github.event.before` with `github.sha`. The caller is responsible for installing Terraform, selecting commands, configuring credentials, and applying path filters.
 The action outputs a JSON array such as `["modules"]` for changed paths under `modules/`. When no changed path contains a folder separator, it outputs `["none"]`. For pull requests it compares the base branch with `HEAD`; for pushes it compares `github.event.before` with `github.sha`.
 
 The action only detects folders. The caller is responsible for installing Terraform, selecting the Terraform command, configuring credentials, and applying any path filters.

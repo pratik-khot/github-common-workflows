@@ -1,0 +1,102 @@
+name: Test Composite Actions
+
+on:
+  pull_request:
+    paths:
+      - .github/actions/**
+      - .github/workflows/**
+  push:
+    branches:
+      - main
+    paths:
+      - .github/actions/**
+      - .github/workflows/**
+
+permissions:
+  contents: read
+
+jobs:
+  changed-terraform-dirs:
+    name: Test changed-terraform-dirs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: changed
+        name: Run local action
+        uses: ./.github/actions/changed-terraform-dirs
+
+      - name: Validate changed-directory output
+        env:
+          ACTUAL: ${{ steps.changed.outputs.dirs }}
+          EVENT_BEFORE: ${{ github.event.before }}
+          EVENT_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          jq -e '
+            type == "array" and
+            length > 0 and
+            all(.[]; type == "string")
+          ' <<< "$ACTUAL" >/dev/null
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            changed_files=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
+          else
+            if [[ -n "$EVENT_BEFORE" && ! "$EVENT_BEFORE" =~ ^0+$ ]]; then
+              changed_files=$(git diff --name-only "$EVENT_BEFORE" "$EVENT_SHA")
+            elif git rev-parse --verify "${EVENT_SHA}^" >/dev/null 2>&1; then
+              changed_files=$(git diff --name-only "${EVENT_SHA}^" "$EVENT_SHA")
+            else
+              changed_files=$(git show --format= --name-only "$EVENT_SHA")
+            fi
+          fi
+
+          expected=$(printf '%s\n' "$changed_files" \
+            | awk -F/ 'NF > 1 && $1 != ".github" && $0 ~ /\.tf$/ {print $1}' \
+            | sort -u \
+            | jq -R -s -c 'split("\n") | map(select(length > 0))')
+
+          [[ "$expected" == "[]" ]] && expected='["none"]'
+          [[ "$ACTUAL" == "$expected" ]] || {
+            echo "Expected: $expected"
+            echo "Actual:   $ACTUAL"
+            exit 1
+          }
+
+  setup-terraform:
+    name: Test setup-terraform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-terraform
+        with:
+          terraform-version: 1.9.8
+      - name: Verify Terraform
+        run: terraform version
+
+  setup-kubectl:
+    name: Test setup-kubectl
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-kubectl
+        with:
+          kubectl-version: v1.32.0
+      - name: Verify kubectl
+        run: kubectl version --client
+
+  setup-helm:
+    name: Test setup-helm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-helm
+        with:
+          helm-version: v3.17.0
+      - name: Verify Helm
+        run: helm version
