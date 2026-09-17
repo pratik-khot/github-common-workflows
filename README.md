@@ -111,7 +111,7 @@ Use workflows under `.github/workflows/` from a caller job with `uses`. Caller r
 ```yaml
 jobs:
   build:
-    uses: YOUR_ORG/github-common-workflows/.github/workflows/docker-build.yml@v1
+    uses: pratik-khot/github-common-workflows/.github/workflows/docker-build.yml@v1
     with:
       context: src/catalog
       file: src/catalog/Dockerfile
