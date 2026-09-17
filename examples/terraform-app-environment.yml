@@ -10,6 +10,20 @@ on:
     paths:
       - myapp/dev/**
   workflow_dispatch:
+    inputs:
+      terraform-root:
+        description: Terraform root to destroy.
+        required: false
+        default: myapp/dev
+        type: string
+      action:
+        description: Set to "destroy" to tear down the given root.
+        required: false
+        default: plan
+        type: choice
+        options:
+          - plan
+          - destroy
 
 permissions:
   contents: read
@@ -20,14 +34,26 @@ jobs:
     if: github.event_name == 'pull_request'
     uses: YOUR_ORG/github-common-workflows/.github/workflows/terraform-plan.yml@v1
     with:
-      terraform-root: myapp/dev
+      root-path: myapp/dev
+      aws-region: us-east-1
     secrets: inherit
 
   apply:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     uses: YOUR_ORG/github-common-workflows/.github/workflows/terraform-apply.yml@v1
     with:
-      terraform-root: myapp/dev
+      root-path: myapp/dev
       environment: dev
       aws-region: us-east-1
+    secrets: inherit
+
+  destroy:
+    if: github.event_name == 'workflow_dispatch' && inputs.action == 'destroy'
+    uses: YOUR_ORG/github-common-workflows/.github/workflows/terraform-destroy.yml@v1
+    with:
+      terraform-root: ${{ inputs.terraform-root }}
+      environment: dev
+      aws-region: us-east-1
+      action: destroy
+      allow-destroy: true
     secrets: inherit

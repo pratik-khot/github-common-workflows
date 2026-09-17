@@ -3,14 +3,19 @@ name: Terraform Plan
 on:
   workflow_call:
     inputs:
-      terraform-root:
-        description: Self-contained Terraform root, for example myapp/dev.
+      root-path:
+        description: Optional path prefix to restrict Terraform root detection to, for example myapp.
+        required: false
+        default: ""
+        type: string
+      aws-region:
+        description: AWS region for the assumed role.
         required: true
         type: string
       terraform-version:
-        description: Terraform version to install.
+        description: Terraform version to install. Leave empty to auto-detect from .terraform-version or required_version.
         required: false
-        default: 1.14.3
+        default: ""
         type: string
       backend-config:
         description: Newline-delimited terraform init backend-config values.
@@ -28,27 +33,72 @@ on:
         default: true
         type: boolean
     secrets:
+      AWS_ROLE_ARN:
+        description: AWS IAM role ARN trusted for GitHub OIDC.
+        required: true
       TF_API_TOKEN:
         description: Optional Terraform Cloud API token.
         required: false
+    outputs:
+      has-changes:
+        description: "\"true\" when at least one Terraform root changed."
+        value: ${{ jobs.detect-changes.outputs.has-changes }}
+      changed-roots:
+        description: JSON array of Terraform roots that were planned.
+        value: ${{ jobs.detect-changes.outputs.matrix }}
 
 permissions:
   contents: read
 
 jobs:
-  plan:
-    name: Plan ${{ inputs.terraform-root }}
+  detect-changes:
+    name: Detect changed Terraform roots
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ${{ inputs.terraform-root }}
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.changed.outputs.dirs }}
+      has-changes: ${{ steps.changed.outputs.has-changes }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: changed
+        name: Detect changed Terraform directories
+        uses: ./.github/actions/changed-terraform-dirs
+        with:
+          root-path: ${{ inputs.root-path }}
+
+  plan:
+    name: Plan ${{ matrix.terraform-root }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has-changes == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        terraform-root: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.terraform-root }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: ./.github/actions/aws-login
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ inputs.aws-region }}
+          role-session-name: gha-${{ github.run_id }}
       - name: Setup Terraform
         uses: ./.github/actions/setup-terraform
         with:
           terraform-version: ${{ inputs.terraform-version }}
+          working-directory: ${{ matrix.terraform-root }}
           terraform-cloud-token: ${{ secrets.TF_API_TOKEN }}
       - name: Check formatting
         run: terraform fmt -check -recursive
@@ -66,11 +116,18 @@ jobs:
         run: terraform validate -no-color
       - name: Create plan
         run: terraform plan -input=false -no-color -out=tfplan ${{ inputs.terraform-args }}
+      - name: Sanitize artifact name
+        if: inputs.upload-plan
+        id: artifact
+        shell: bash
+        run: |
+          safe_name=$(echo "${{ matrix.terraform-root }}" | tr '/' '-')
+          echo "name=tfplan-${safe_name}-${{ github.run_id }}-${{ github.run_attempt }}" >> "$GITHUB_OUTPUT"
       - name: Upload plan
         if: inputs.upload-plan
         uses: actions/upload-artifact@v4
         with:
-          name: terraform-plan-${{ github.run_id }}
-          path: ${{ inputs.terraform-root }}/tfplan
+          name: ${{ steps.artifact.outputs.name }}
+          path: ${{ matrix.terraform-root }}/tfplan
           if-no-files-found: error
           retention-days: 7

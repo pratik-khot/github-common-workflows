@@ -1,17 +1,24 @@
-name: Terraform Apply
+name: Terraform Destroy
 
 on:
   workflow_call:
     inputs:
-      root-path:
-        description: Optional path prefix to restrict Terraform root detection to, for example myapp.
-        required: false
-        default: ""
-        type: string
-      environment:
-        description: Protected GitHub Environment that authorizes this deployment.
+      terraform-root:
+        description: Self-contained Terraform root to destroy, for example myapp/dev.
         required: true
         type: string
+      environment:
+        description: Protected GitHub Environment that authorizes this destroy.
+        required: true
+        type: string
+      action:
+        description: Must be "destroy" to confirm intent.
+        required: true
+        type: string
+      allow-destroy:
+        description: Explicit second confirmation that destroy is permitted.
+        required: true
+        type: boolean
       aws-region:
         description: AWS region for the assumed role.
         required: true
@@ -27,7 +34,7 @@ on:
         default: ""
         type: string
       terraform-args:
-        description: Additional arguments passed to terraform apply.
+        description: Additional arguments passed to terraform destroy.
         required: false
         default: ""
         type: string
@@ -43,43 +50,21 @@ permissions:
   contents: read
 
 jobs:
-  detect-changes:
-    name: Detect changed Terraform roots
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    outputs:
-      matrix: ${{ steps.changed.outputs.dirs }}
-      has-changes: ${{ steps.changed.outputs.has-changes }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - id: changed
-        name: Detect changed Terraform directories
-        uses: ./.github/actions/changed-terraform-dirs
-        with:
-          root-path: ${{ inputs.root-path }}
-
-  apply:
-    name: Apply ${{ matrix.terraform-root }}
-    needs: detect-changes
-    if: needs.detect-changes.outputs.has-changes == 'true'
+  destroy:
+    name: Destroy ${{ inputs.terraform-root }}
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     permissions:
       contents: read
       id-token: write
-    strategy:
-      fail-fast: false
-      matrix:
-        terraform-root: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
     defaults:
       run:
-        working-directory: ${{ matrix.terraform-root }}
+        working-directory: ${{ inputs.terraform-root }}
     steps:
+      - name: Reject unconfirmed destroy
+        if: inputs.action != 'destroy' || !inputs.allow-destroy
+        run: |
+          echo "::error::Destroy requires action=destroy and allow-destroy=true." && exit 1
       - name: Checkout
         uses: actions/checkout@v4
       - name: Configure AWS credentials
@@ -92,7 +77,7 @@ jobs:
         uses: ./.github/actions/setup-terraform
         with:
           terraform-version: ${{ inputs.terraform-version }}
-          working-directory: ${{ matrix.terraform-root }}
+          working-directory: ${{ inputs.terraform-root }}
           terraform-cloud-token: ${{ secrets.TF_API_TOKEN }}
       - name: Initialize Terraform
         shell: bash
@@ -104,7 +89,5 @@ jobs:
           ${{ inputs.backend-config }}
           EOF
           terraform init -input=false "${init_args[@]}"
-      - name: Validate configuration
-        run: terraform validate -no-color
-      - name: Apply changes
-        run: terraform apply -input=false -auto-approve ${{ inputs.terraform-args }}
+      - name: Destroy infrastructure
+        run: terraform destroy -input=false -auto-approve ${{ inputs.terraform-args }}

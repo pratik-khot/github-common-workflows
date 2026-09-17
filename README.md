@@ -25,23 +25,27 @@ myapp/
     terraform.tfvars
 ```
 
-Pass the environment directory to workflows as `terraform-root`, for example `myapp/dev`.
+`terraform-plan.yml` and `terraform-apply.yml` auto-detect every changed Terraform root and build their own matrix. Callers never set a `terraform-root`, run `checkout`, log in to AWS, or invoke `terraform` directly.
 
 ## Consume a workflow
 
 Use a released major version in callers. Pin production-critical workflows to an immutable release tag after the first release.
 
 ```yaml
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   plan:
+    if: github.event_name == 'pull_request'
     uses: pratik-khot/github-common-workflows/.github/workflows/terraform-plan.yml@v1
     with:
-      terraform-root: myapp/dev
-      terraform-version: 1.14.3
+      aws-region: us-east-1
     secrets: inherit
 ```
 
-Terraform apply requires a caller environment and AWS OIDC permissions:
+Terraform apply requires a caller environment; the workflow only applies on `push` to `main` and manages its own AWS OIDC login internally:
 
 ```yaml
 permissions:
@@ -50,11 +54,37 @@ permissions:
 
 jobs:
   apply:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     uses: pratik-khot/github-common-workflows/.github/workflows/terraform-apply.yml@v1
     with:
-      terraform-root: myapp/prod
       environment: prod
       aws-region: us-east-1
+    secrets: inherit
+```
+
+Terraform destroy is explicit and meant for `workflow_dispatch`:
+
+```yaml
+on:
+  workflow_dispatch:
+    inputs:
+      terraform-root:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  destroy:
+    uses: pratik-khot/github-common-workflows/.github/workflows/terraform-destroy.yml@v1
+    with:
+      terraform-root: ${{ inputs.terraform-root }}
+      environment: prod
+      aws-region: us-east-1
+      action: destroy
+      allow-destroy: true
     secrets: inherit
 ```
 
@@ -66,13 +96,14 @@ Use workflows under `.github/workflows/` from a caller job with `uses`. Caller r
 
 | Workflow | What it does | Key inputs | Required permissions and secrets |
 | --- | --- | --- | --- |
-| `terraform-plan.yml` | Runs `fmt`, `init`, `validate`, and `plan` from one app/environment root. Optionally uploads `tfplan`. | `terraform-root`, `terraform-version`, `backend-config`, `terraform-args` | `contents: read`; optional `TF_API_TOKEN` for Terraform Cloud. |
-| `terraform-apply.yml` | Assumes AWS role through OIDC, initializes and validates Terraform, then applies or explicitly allowed destroys. | `terraform-root`, `environment`, `aws-region`, `action`, `allow-destroy` | `contents: read`, `id-token: write`; `AWS_ROLE_ARN`; optional `TF_API_TOKEN`. |
+| `terraform-plan.yml` | Detects changed Terraform roots, builds a matrix, assumes AWS role through OIDC, then runs `fmt`, `init`, `validate`, and `plan` per root and uploads `tfplan`. | `aws-region`, `root-path`, `terraform-version`, `backend-config`, `terraform-args`, `upload-plan` | `contents: read`, `id-token: write`; `AWS_ROLE_ARN`; optional `TF_API_TOKEN`. |
+| `terraform-apply.yml` | Detects changed Terraform roots, builds a matrix, assumes AWS role through OIDC, then runs `init`, `validate`, and `apply -auto-approve` per root. Only runs on push to `main`. | `environment`, `aws-region`, `root-path`, `terraform-version`, `backend-config`, `terraform-args` | `contents: read`, `id-token: write`; `AWS_ROLE_ARN`; optional `TF_API_TOKEN`. |
+| `terraform-destroy.yml` | Assumes AWS role through OIDC and runs `init`/`destroy` for one explicit root; requires `action: destroy` and `allow-destroy: true`. Intended for `workflow_dispatch`. | `terraform-root`, `environment`, `action`, `allow-destroy`, `aws-region` | `contents: read`, `id-token: write`; `AWS_ROLE_ARN`; optional `TF_API_TOKEN`. |
 | `docker-build.yml` | Checks out the caller, configures Buildx/QEMU, and builds a Docker image. It does not push unless `push: true`. | `context`, `file`, `image-name`, `tags`, `platforms` | `contents: read`. |
 | `docker-publish.yml` | Assumes AWS role through OIDC, authenticates to ECR, builds multi-platform images, pushes tags, and returns an image digest. | `ecr-registry`, `image-name`, `tags`, `aws-region`, `platforms` | `contents: read`, `id-token: write`; `AWS_ROLE_ARN`. |
 | `helm-package.yml` | Builds dependencies, lints, packages a Helm chart, uploads its archive, and can push it to OCI. | `chart-path`, `oci-registry`, `push` | `contents: read`; caller must make OCI credentials available when pushing. |
 | `gitops-update.yml` | Clones a GitOps repository, updates one Kustomize image or Helm values path, validates Kustomize, and creates a PR by default. | `gitops-repository`, `target-directory`, `update-type`, `image-reference` | `contents: read`; `GITOPS_TOKEN` with access to the target GitOps repository. |
-| `security-scan.yml` | Runs selected Checkov Terraform, Gitleaks secret, and Trivy image scans; uploads Trivy SARIF. | `terraform-root`, `image-reference`, `scan-terraform`, `scan-secrets`, `scan-image` | `contents: read`, `security-events: write`. |
+| `security-scan.yml` | Detects changed Terraform roots and runs Checkov per root, plus independent Gitleaks secret and Trivy image scans; uploads Trivy SARIF. | `root-path`, `image-reference`, `scan-terraform`, `scan-secrets`, `scan-image` | `contents: read`, `security-events: write`. |
 | `release.yml` | Runs Release Please and returns whether a release was created plus its tag. | `release-type`, `config-file`, `manifest-file` | `contents: write`, `pull-requests: write`; optional `RELEASE_TOKEN`. |
 
 ### Docker build
@@ -140,6 +171,8 @@ For a Helm value update, set `update-type: helm-value` and add `helm-values-path
 
 ### Security scan
 
+Like `terraform-plan.yml`, the Terraform scan auto-detects every changed root and builds its own matrix; callers never hardcode a directory. Secret and image scans run independently of Terraform changes.
+
 ```yaml
 permissions:
   contents: read
@@ -149,10 +182,11 @@ jobs:
   security:
     uses: pratik-khot/github-common-workflows/.github/workflows/security-scan.yml@v1
     with:
-      terraform-root: myapp/dev
       scan-image: true
       image-reference: 123456789012.dkr.ecr.us-east-1.amazonaws.com/catalog:v1.2.3
 ```
+
+Use `root-path` to restrict Terraform detection to a subtree, for example `root-path: myapp`.
 
 ### Release Please
 
@@ -174,7 +208,8 @@ Composite actions are lower-level building blocks for a workflow that needs only
 
 | Action | What it does | Required inputs |
 | --- | --- | --- |
-| `setup-terraform` | Enables the Terraform provider-plugin cache and installs the requested Terraform version; can configure Terraform Cloud credentials. | `terraform-version`; optional `terraform-cloud-token`. |
+| `setup-terraform` | Enables the Terraform provider-plugin cache and installs the requested Terraform version, auto-detecting it from `.terraform-version` or `required_version` when omitted; can configure Terraform Cloud credentials. | Optional `terraform-version`, `working-directory`, `terraform-cloud-token`. |
+| `changed-terraform-dirs` | Detects Terraform root directories with a changed `.tf`/`.tfvars` file and outputs a JSON matrix plus a `has-changes` flag. | Optional `root-path`. |
 | `setup-kubectl` | Installs the requested kubectl version. | Optional `kubectl-version`. |
 | `setup-helm` | Installs the requested Helm version. | Optional `helm-version`. |
 | `aws-login` | Exchanges the GitHub OIDC token for AWS role credentials. | `role-to-assume`, `aws-region`; optional `role-session-name`. |

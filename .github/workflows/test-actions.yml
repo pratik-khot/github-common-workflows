@@ -32,6 +32,7 @@ jobs:
       - name: Validate changed-directory output
         env:
           ACTUAL: ${{ steps.changed.outputs.dirs }}
+          ACTUAL_HAS_CHANGES: ${{ steps.changed.outputs.has-changes }}
           EVENT_BEFORE: ${{ github.event.before }}
           EVENT_SHA: ${{ github.sha }}
         shell: bash
@@ -40,7 +41,6 @@ jobs:
 
           jq -e '
             type == "array" and
-            length > 0 and
             all(.[]; type == "string")
           ' <<< "$ACTUAL" >/dev/null
 
@@ -57,15 +57,27 @@ jobs:
             fi
           fi
 
-          expected=$(printf '%s\n' "$changed_files" \
-            | awk -F/ 'NF > 1 && $1 != ".github" && $0 ~ /\.tf$/ {print $1}' \
-            | sort -u \
-            | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          tf_files=$(printf '%s\n' "$changed_files" | grep -E '\.(tf|tfvars)$' | grep -v '^\.github/' || true)
 
-          [[ "$expected" == "[]" ]] && expected='["none"]'
+          if [[ -z "$tf_files" ]]; then
+            expected="[]"
+            expected_has_changes="false"
+          else
+            expected=$(printf '%s\n' "$tf_files" \
+              | xargs -r -n1 dirname \
+              | sort -u \
+              | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            expected_has_changes="true"
+          fi
+
           [[ "$ACTUAL" == "$expected" ]] || {
-            echo "Expected: $expected"
-            echo "Actual:   $ACTUAL"
+            echo "Expected dirs: $expected"
+            echo "Actual dirs:   $ACTUAL"
+            exit 1
+          }
+          [[ "$ACTUAL_HAS_CHANGES" == "$expected_has_changes" ]] || {
+            echo "Expected has-changes: $expected_has_changes"
+            echo "Actual has-changes:   $ACTUAL_HAS_CHANGES"
             exit 1
           }
 
@@ -79,6 +91,23 @@ jobs:
           terraform-version: 1.9.8
       - name: Verify Terraform
         run: terraform version
+
+  setup-terraform-auto-detect:
+    name: Test setup-terraform version auto-detect
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create sample .terraform-version
+        shell: bash
+        run: |
+          mkdir -p /tmp/tf-sample
+          echo "1.9.8" > /tmp/tf-sample/.terraform-version
+      - uses: ./.github/actions/setup-terraform
+        with:
+          working-directory: /tmp/tf-sample
+      - name: Verify Terraform
+        run: terraform version | grep -q "1.9.8"
+
 
   setup-kubectl:
     name: Test setup-kubectl

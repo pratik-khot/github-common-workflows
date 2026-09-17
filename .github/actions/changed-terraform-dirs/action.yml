@@ -1,26 +1,38 @@
 name: Changed Terraform Dirs
-description: Detect changed top-level folders and output them for CI matrices.
+description: Detect changed Terraform root directories and output them for CI matrices.
+
+inputs:
+  root-path:
+    description: Optional path prefix to restrict detection to, for example myapp.
+    required: false
+    default: ""
 
 outputs:
   dirs:
-    description: JSON array of changed top-level folders.
+    description: JSON array of changed Terraform root directories.
     value: ${{ steps.changed.outputs.dirs }}
+  has-changes:
+    description: "\"true\" when at least one Terraform root changed."
+    value: ${{ steps.changed.outputs.has-changes }}
 
 runs:
   using: composite
   steps:
     - id: changed
-      name: Detect changed folders
+      name: Detect changed Terraform roots
       shell: bash
       env:
         EVENT_BEFORE: ${{ github.event.before }}
         EVENT_SHA: ${{ github.sha }}
+        BASE_REF: ${{ github.base_ref }}
+        EVENT_NAME: ${{ github.event_name }}
+        ROOT_PATH: ${{ inputs.root-path }}
       run: |
         set -euo pipefail
 
-        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-          git fetch origin "${{ github.base_ref }}"
-          changed_files=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
+        if [[ "$EVENT_NAME" == "pull_request" ]]; then
+          git fetch --no-tags --depth=1 origin "$BASE_REF"
+          changed_files=$(git diff --name-only "origin/$BASE_REF...HEAD")
         else
           if [[ -n "$EVENT_BEFORE" && ! "$EVENT_BEFORE" =~ ^0+$ ]] && \
             git cat-file -e "$EVENT_BEFORE^{commit}" 2>/dev/null; then
@@ -33,12 +45,29 @@ runs:
           fi
         fi
 
-        dirs=$(printf '%s\n' "$changed_files" \
-          | awk -F/ 'NF > 1 && $1 != ".github" && $0 ~ /\.tf$/ {print $1}' \
-          | sort -u \
-          | jq -R -s -c 'split("\n") | map(select(length > 0))')
+        # A Terraform root is the directory that directly contains a changed .tf/.tfvars file.
+        tf_files=$(printf '%s\n' "$changed_files" | grep -E '\.(tf|tfvars)$' | grep -v '^\.github/' || true)
 
-        [[ "$dirs" == "[]" ]] && dirs='["none"]'
+        if [[ -n "$ROOT_PATH" ]]; then
+          tf_files=$(printf '%s\n' "$tf_files" | grep -E "^${ROOT_PATH}/" || true)
+        fi
+
+        if [[ -z "$tf_files" ]]; then
+          dirs="[]"
+        else
+          dirs=$(printf '%s\n' "$tf_files" \
+            | xargs -r -n1 dirname \
+            | sort -u \
+            | jq -R -s -c 'split("\n") | map(select(length > 0))')
+        fi
+
+        if [[ "$dirs" == "[]" || -z "$dirs" ]]; then
+          dirs="[]"
+          has_changes="false"
+        else
+          has_changes="true"
+        fi
 
         echo "dirs=$dirs" >> "$GITHUB_OUTPUT"
-        echo "Changed folders: $dirs"
+        echo "has-changes=$has_changes" >> "$GITHUB_OUTPUT"
+        echo "Changed Terraform roots: $dirs"

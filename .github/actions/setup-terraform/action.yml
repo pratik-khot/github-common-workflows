@@ -3,8 +3,13 @@ description: Install Terraform with the GitHub Actions plugin cache enabled.
 
 inputs:
   terraform-version:
-    description: Terraform version to install.
-    required: true
+    description: Terraform version to install. Leave empty to auto-detect.
+    required: false
+    default: ""
+  working-directory:
+    description: Directory to search for .terraform-version or required_version when auto-detecting.
+    required: false
+    default: "."
   terraform-cloud-token:
     description: Optional Terraform Cloud API token.
     required: false
@@ -17,8 +22,41 @@ runs:
       run: |
         echo "TF_PLUGIN_CACHE_DIR=$RUNNER_TOOL_CACHE/terraform-plugin-cache" >> "$GITHUB_ENV"
         mkdir -p "$RUNNER_TOOL_CACHE/terraform-plugin-cache"
+    - id: resolve-version
+      name: Resolve Terraform version
+      shell: bash
+      env:
+        INPUT_VERSION: ${{ inputs.terraform-version }}
+        WORKING_DIR: ${{ inputs.working-directory }}
+      run: |
+        set -euo pipefail
+
+        version="$INPUT_VERSION"
+
+        if [[ -z "$version" && -f "$WORKING_DIR/.terraform-version" ]]; then
+          version=$(tr -d '[:space:]' < "$WORKING_DIR/.terraform-version")
+          echo "Detected Terraform version from .terraform-version: $version"
+        fi
+
+        if [[ -z "$version" ]]; then
+          detected=$(grep -rhoE 'required_version\s*=\s*"[^"]+"' "$WORKING_DIR" --include='*.tf' 2>/dev/null \
+            | head -n1 \
+            | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' \
+            || true)
+          if [[ -n "$detected" ]]; then
+            version="$detected"
+            echo "Detected Terraform version from required_version: $version"
+          fi
+        fi
+
+        if [[ -z "$version" ]]; then
+          version="latest"
+          echo "No version specified or detected; falling back to latest."
+        fi
+
+        echo "version=$version" >> "$GITHUB_OUTPUT"
     - name: Install Terraform
       uses: hashicorp/setup-terraform@v3
       with:
-        terraform_version: ${{ inputs.terraform-version }}
+        terraform_version: ${{ steps.resolve-version.outputs.version }}
         cli_config_credentials_token: ${{ inputs.terraform-cloud-token }}
