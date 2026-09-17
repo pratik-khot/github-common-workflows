@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/pratik-khot/github-common-workflows/compare/v1.0.2...v1.1.0) (2026-09-17)
+
+
+### Features
+
+* **release:** add release metadata outputs and templates ([a36172d](https://github.com/pratik-khot/github-common-workflows/commit/a36172d9ea16f38cf6797718b17b659f53f326d7))
+
 ## [1.0.2](https://github.com/pratik-khot/github-common-workflows/compare/v1.0.1...v1.0.2) (2026-09-17)
 
 
