@@ -17,6 +17,14 @@ on:
         value: ${{ jobs.release.outputs.release-created }}
       tag-name:
         value: ${{ jobs.release.outputs.tag-name }}
+      html-url:
+        value: ${{ jobs.release.outputs.html-url }}
+      major:
+        value: ${{ jobs.release.outputs.major }}
+      minor:
+        value: ${{ jobs.release.outputs.minor }}
+      patch:
+        value: ${{ jobs.release.outputs.patch }}
     secrets:
       RELEASE_TOKEN:
         required: false
@@ -31,10 +39,27 @@ jobs:
     outputs:
       release-created: ${{ steps.release.outputs.release_created }}
       tag-name: ${{ steps.release.outputs.tag_name }}
+      html-url: ${{ steps.release.outputs.html_url }}
+      major: ${{ steps.version.outputs.major }}
+      minor: ${{ steps.version.outputs.minor }}
+      patch: ${{ steps.version.outputs.patch }}
     steps:
       - id: release
         uses: googleapis/release-please-action@v4
         with:
           token: ${{ secrets.RELEASE_TOKEN || github.token }}
           release-type: ${{ inputs.release-type }}
-          release-as: ${{ inputs.release-as }}
+
+      - name: Extract version parts
+        id: version
+        if: steps.release.outputs.release_created == 'true'
+        shell: bash
+        run: |
+          VERSION="${{ steps.release.outputs.tag_name }}"
+          VERSION="${VERSION#v}"
+
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+
+          echo "major=$MAJOR" >> "$GITHUB_OUTPUT"
+          echo "minor=$MINOR" >> "$GITHUB_OUTPUT"
+          echo "patch=$PATCH" >> "$GITHUB_OUTPUT"
