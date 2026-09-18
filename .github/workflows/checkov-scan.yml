@@ -3,9 +3,9 @@ name: Checkov Scan
 on:
   workflow_call:
     inputs:
-      root-path:
-        required: false
-        default: ""
+      terraform-roots:
+        description: JSON array of terraform roots to scan.
+        required: true
         type: string
 
 permissions:
@@ -13,32 +13,19 @@ permissions:
   security-events: write
 
 jobs:
-  detect-changes:
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.changed.outputs.dirs }}
-      has-changes: ${{ steps.changed.outputs.has-changes }}
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - id: changed
-        uses: pratik-khot/github-common-workflows/.github/actions/changed-terraform-dirs@v1
-        with:
-          root-path: ${{ inputs.root-path }}
 
   checkov:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.has-changes == 'true'
-
+    name: Checkov Scan ${{ matrix.terraform-root }}
     runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
       matrix:
-        terraform-root: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+        terraform-root: ${{ fromJson(inputs.terraform-roots) }}
+
+    defaults:
+      run:
+        working-directory: ${{ matrix.terraform-root }}
 
     steps:
       - uses: actions/checkout@v4
@@ -46,5 +33,4 @@ jobs:
       - name: Run Checkov
         uses: bridgecrewio/checkov-action@v12
         with:
-          directory: ${{ matrix.terraform-root }}
           framework: terraform
