@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.5](https://github.com/pratik-khot/github-common-workflows/compare/v1.1.4...v1.1.5) (2026-09-18)
+
+
+### Bug Fixes
+
+* modified checkov workflow to get inputs from matrix ([fa7078f](https://github.com/pratik-khot/github-common-workflows/commit/fa7078fb0de42a06286bebdd8466e4445c445f8a))
+
 ## [1.1.4](https://github.com/pratik-khot/github-common-workflows/compare/v1.1.3...v1.1.4) (2026-09-18)
 
 
