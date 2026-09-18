@@ -64,9 +64,9 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v4
         with:
-          terraform-version: ${{ inputs.terraform-version }}
-          working-directory: ${{ inputs.terraform-root }}
-          terraform-cloud-token: ${{ secrets.TF_API_TOKEN }}
+          terraform_version: ${{ inputs.terraform-version }}
+          cli_config_credentials_hostname: app.terraform.io
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
       - name: Initialize Terraform
         shell: bash
         run: |
