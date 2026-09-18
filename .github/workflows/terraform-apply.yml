@@ -22,6 +22,10 @@ on:
         required: false
         default: ""
         type: string
+      terraform-roots:
+        description: JSON array of terraform roots to apply.
+        required: true
+        type: string
     secrets:
       AWS_ROLE_ARN:
         description: AWS IAM role ARN trusted for GitHub OIDC.
@@ -34,30 +38,8 @@ permissions:
   contents: read
 
 jobs:
-  detect-changes:
-    name: Detect changed Terraform roots
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    outputs:
-      matrix: ${{ steps.changed.outputs.dirs }}
-      has-changes: ${{ steps.changed.outputs.has-changes }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - id: changed
-        name: Detect changed Terraform directories
-        uses: pratik-khot/github-common-workflows/.github/actions/changed-terraform-dirs@v1
-        with:
-          root-path: ${{ inputs.root-path }}
-
   apply:
     name: Apply ${{ matrix.terraform-root }}
-    needs: detect-changes
-    if: needs.detect-changes.outputs.has-changes == 'true'
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     permissions:
@@ -66,7 +48,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        terraform-root: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+        terraform-root: ${{ fromJson(inputs.terraform-roots) }}
     defaults:
       run:
         working-directory: ${{ matrix.terraform-root }}
