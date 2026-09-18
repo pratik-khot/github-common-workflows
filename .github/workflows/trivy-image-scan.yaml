@@ -1,0 +1,30 @@
+name: Trivy Image Scan
+
+on:
+  workflow_call:
+    inputs:
+      image-reference:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  scan-image:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Scan container image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ inputs.image-reference }}
+          format: sarif
+          output: trivy-results.sarif
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
