@@ -66,7 +66,7 @@ jobs:
           fetch-depth: 0
       - id: changed
         name: Detect changed Terraform directories
-        uses: ./.github/actions/changed-terraform-dirs
+        uses: pratik-khot/github-common-workflows/.github/actions/changed-terraform-dirs@v1
         with:
           root-path: ${{ inputs.root-path }}
 
@@ -89,13 +89,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Configure AWS credentials
-        uses: ./.github/actions/aws-login
+        uses: aws-actions/configure-aws-credentials@v2
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ inputs.aws-region }}
           role-session-name: gha-${{ github.run_id }}
       - name: Setup Terraform
-        uses: ./.github/actions/setup-terraform
+        uses: hashicorp/setup-terraform@v4
         with:
           terraform-version: ${{ inputs.terraform-version }}
           working-directory: ${{ matrix.terraform-root }}

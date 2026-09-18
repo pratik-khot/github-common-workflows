@@ -32,7 +32,7 @@ jobs:
       chart-package: ${{ steps.package.outputs.chart-package }}
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-helm
+      - uses: azure/setup-helm@v3
         with:
           helm-version: ${{ inputs.helm-version }}
       - name: Build dependencies

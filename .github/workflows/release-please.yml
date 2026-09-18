@@ -11,5 +11,5 @@ permissions:
 
 jobs:
   release:
-    uses: ./.github/workflows/release.yml
+    uses: pratik-khot/github-common-workflows/.github/workflows/release.yml@v1
     secrets: inherit

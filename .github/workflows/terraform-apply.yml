@@ -10,7 +10,8 @@ on:
         type: string
       environment:
         description: Protected GitHub Environment that authorizes this deployment.
-        required: true
+        required: false
+        default: ""
         type: string
       aws-region:
         description: AWS region for the assumed role.
@@ -18,16 +19,6 @@ on:
         type: string
       terraform-version:
         description: Terraform version to install. Leave empty to auto-detect from .terraform-version or required_version.
-        required: false
-        default: ""
-        type: string
-      backend-config:
-        description: Newline-delimited terraform init backend-config values.
-        required: false
-        default: ""
-        type: string
-      terraform-args:
-        description: Additional arguments passed to terraform apply.
         required: false
         default: ""
         type: string
@@ -59,7 +50,7 @@ jobs:
           fetch-depth: 0
       - id: changed
         name: Detect changed Terraform directories
-        uses: ./.github/actions/changed-terraform-dirs
+        uses: pratik-khot/github-common-workflows/.github/actions/changed-terraform-dirs@v1
         with:
           root-path: ${{ inputs.root-path }}
 
@@ -83,28 +74,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Configure AWS credentials
-        uses: ./.github/actions/aws-login
+        uses: aws-actions/configure-aws-credentials@v2
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ inputs.aws-region }}
           role-session-name: gha-${{ github.run_id }}
       - name: Setup Terraform
-        uses: ./.github/actions/setup-terraform
+        uses: hashicorp/setup-terraform@v4
         with:
           terraform-version: ${{ inputs.terraform-version }}
           working-directory: ${{ matrix.terraform-root }}
           terraform-cloud-token: ${{ secrets.TF_API_TOKEN }}
       - name: Initialize Terraform
-        shell: bash
-        run: |
-          init_args=()
-          while IFS= read -r backend_config; do
-            [ -z "$backend_config" ] || init_args+=("-backend-config=$backend_config")
-          done <<'EOF'
-          ${{ inputs.backend-config }}
-          EOF
-          terraform init -input=false "${init_args[@]}"
+        working-directory: ${{ matrix.terraform-root }}
+        run: terraform init -input=false 
       - name: Validate configuration
         run: terraform validate -no-color
       - name: Apply changes
-        run: terraform apply -input=false -auto-approve ${{ inputs.terraform-args }}
+        run: terraform apply -input=false -auto-approve 
