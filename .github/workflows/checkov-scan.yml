@@ -3,7 +3,7 @@ name: Checkov Scan
 on:
   workflow_call:
     inputs:
-      terraform-roots:
+      scan-roots:
         description: JSON array of terraform roots to scan.
         required: true
         type: string
@@ -15,22 +15,22 @@ permissions:
 jobs:
 
   checkov:
-    name: Checkov Scan ${{ matrix.terraform-root }}
+    name: Checkov Scan ${{ matrix.scan-root }}
     runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
       matrix:
-        terraform-root: ${{ fromJson(inputs.terraform-roots) }}
+        scan-root: ${{ fromJson(inputs.scan-roots) }}
 
     defaults:
       run:
-        working-directory: ${{ matrix.terraform-root }}
+        working-directory: ${{ matrix.scan-root }}
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Run Checkov
         uses: bridgecrewio/checkov-action@v12
-        with:
-          framework: terraform
+        # with:
+        #   framework: terraform
