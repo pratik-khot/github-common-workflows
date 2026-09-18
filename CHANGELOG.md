@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.3](https://github.com/pratik-khot/github-common-workflows/compare/v1.1.2...v1.1.3) (2026-09-18)
+
+
+### Bug Fixes
+
+* modified errored workflows ([cd2363b](https://github.com/pratik-khot/github-common-workflows/commit/cd2363bc1987f8f3b68410bf12698434110c2423))
+
 ## [1.1.2](https://github.com/pratik-khot/github-common-workflows/compare/v1.1.1...v1.1.2) (2026-09-18)
 
 
