@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/pratik-khot/github-common-workflows/compare/v1.1.5...v1.2.0) (2026-09-18)
+
+
+### Features
+
+* **checkov:** use repository .checkov.yaml for framework selection ([03f7eb3](https://github.com/pratik-khot/github-common-workflows/commit/03f7eb35af2fa0653dcec6031e8020421de7924a))
+
 ## [1.1.5](https://github.com/pratik-khot/github-common-workflows/compare/v1.1.4...v1.1.5) (2026-09-18)
 
 
