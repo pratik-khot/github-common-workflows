@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.2](https://github.com/pratik-khot/github-common-workflows/compare/v1.2.1...v1.2.2) (2026-09-18)
+
+
+### Bug Fixes
+
+* Destroy Workflow ([c346a3f](https://github.com/pratik-khot/github-common-workflows/commit/c346a3fbc084ddbbafb7ec0db95793c5e9d02afc))
+
 ## [1.2.1](https://github.com/pratik-khot/github-common-workflows/compare/v1.2.0...v1.2.1) (2026-09-18)
 
 
