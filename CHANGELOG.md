@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/pratik-khot/github-common-workflows/compare/v1.1.0...v1.1.1) (2026-09-18)
+
+
+### Bug Fixes
+
+* resolve GitHub Actions workflow startup failure ([a977f08](https://github.com/pratik-khot/github-common-workflows/commit/a977f08ae18dfc5f30169465d05669074525652e))
+
 ## [1.1.0](https://github.com/pratik-khot/github-common-workflows/compare/v1.0.2...v1.1.0) (2026-09-17)
 
 
