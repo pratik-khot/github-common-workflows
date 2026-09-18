@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/pratik-khot/github-common-workflows/compare/v1.1.1...v1.1.2) (2026-09-18)
+
+
+### Bug Fixes
+
+* modify workflows and remove unused actions ([40bf08e](https://github.com/pratik-khot/github-common-workflows/commit/40bf08e4d6c4758b6162a7f7bfe6df2e06441fb6))
+
 ## [1.1.1](https://github.com/pratik-khot/github-common-workflows/compare/v1.1.0...v1.1.1) (2026-09-18)
 
 
