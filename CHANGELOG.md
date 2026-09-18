@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.4](https://github.com/pratik-khot/github-common-workflows/compare/v1.1.3...v1.1.4) (2026-09-18)
+
+
+### Bug Fixes
+
+* moved action usage to caller workflows ([44f33fa](https://github.com/pratik-khot/github-common-workflows/commit/44f33fa80088d2dbb26a436e192c7fcadfcf3ddf))
+
 ## [1.1.3](https://github.com/pratik-khot/github-common-workflows/compare/v1.1.2...v1.1.3) (2026-09-18)
 
 
